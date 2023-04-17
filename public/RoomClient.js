@@ -17,7 +17,8 @@ const _EVENTS = {
 
 class RoomClient {
   socket = null;
-  constructor(localMediaEl,remoteVideoEl,remoteAudioEl,mediasoupClient,socket,room_id,name,successCallback) {
+  _mediaSoupCallback = null;
+  constructor(localMediaEl, remoteVideoEl, remoteAudioEl, mediasoupClient, socket, room_id, name, successCallback) {
     this.name = name;
     this.localMediaEl = localMediaEl;
     this.remoteVideoEl = remoteVideoEl;
@@ -44,35 +45,35 @@ class RoomClient {
     this._isOpen = false;
     this.eventListeners = new Map();
 
+
     Object.keys(_EVENTS).forEach(
       function (evt) {
         this.eventListeners.set(evt, []);
       }.bind(this)
     );
-      
+
   }
 
   ////////// INIT /////////
 
 
   async createRoom(room_id) {
-    var dataObj = {commandType:"CreateRoom",Data: { RoomId:room_id } };     
+    var dataObj = { commandType: "CreateRoom", Data: { RoomId: room_id } };
     await this.socket.sendCommand(JSON.stringify(dataObj));
   }
 
   async join(name, room_id) {
-    var dataObj ={commandType:"JoinRoom", Data: { Name:name, RoomId:room_id}};
+    var dataObj = { commandType: "JoinRoom", Data: { Name: name, RoomId: room_id } };
     await this.socket.sendCommand(JSON.stringify(dataObj))
     this._isOpen = true;
   }
 
   async getRouterRtpCapabilities(name, room_id) {
-    var dataObj = {commandType:"getRouterRtpCapabilities", Data: { Name:name, RoomId:room_id}};
+    var dataObj = { commandType: "getRouterRtpCapabilities", Data: { Name: name, RoomId: room_id } };
     await this.socket.sendCommand(JSON.stringify(dataObj))
   }
 
   async loadDevice(routerRtpCapabilities) {
-    debugger
     let device;
     try {
       device = new this.mediasoupClient.Device();
@@ -84,13 +85,13 @@ class RoomClient {
       console.error(error);
     }
 
-    await device.load({routerRtpCapabilities});
+    await device.load({ routerRtpCapabilities, });
     this.device = device;
-  
-    var data =  JSON.stringify({
-      CommandType:"DeviceLoaded",
-      Data:{Device:this.device, Message:"Device Loaded Successfully"},
-      Event:"DeviceLoaded"
+
+    var data = JSON.stringify({
+      CommandType: "DeviceLoaded",
+      Data: { Device: this.device, Message: "Device Loaded Successfully" },
+      Event: "DeviceLoaded"
     });
 
     this.socket.emitCommand(data);
@@ -101,76 +102,92 @@ class RoomClient {
     this.removeConsumer(consumer_id);
   }
 
-  async newProducers (data) {
+  async newProducers(data) {
     console.log("New producers", data);
     for (let { producer_id } of data) {
       await this.consume(producer_id);
     }
   }
 
-  disconnect () {
+  disconnect() {
     this.exit(true);
   }
 
 
-  async createWebRtcTransport(device,transport_type,room_id){
+  async createWebRtcTransport(device, transport_type, room_id) {
     var dataObj = null
-    if(transport_type == "producerTransport" ){
+    if (transport_type == "producerTransport") {
       dataObj = {
-                  commandType:"createWebRtcTransport",
-                  Data: {
-                          RoomId:room_id, 
-                          forceTcp: false, 
-                          rtpCapabilities: device.rtpCapabilities,
-                          transportType: transport_type
-                        }
-                }; 
+        commandType: "createWebRtcTransport",
+        Data: {
+          RoomId: room_id,
+          forceTcp: false,
+          rtpCapabilities: device.rtpCapabilities,
+          transportType: transport_type
+        }
+      };
     }
-    else if(transport_type == "consumerTransport")   {
+    else if (transport_type == "consumerTransport") {
       dataObj = {
-                  commandType:"createWebRtcTransport",
-                  Data: {
-                          RoomId:room_id, 
-                          forceTcp: false,
-                          transportType: transport_type
-                        }
-                };     
+        commandType: "createWebRtcTransport",
+        Data: {
+          RoomId: room_id,
+          forceTcp: false,
+          transportType: transport_type
+        }
+      };
     }
     await this.socket.sendCommand(JSON.stringify(dataObj));
-  } 
+  }
+
+  async mediasoupCallback(callbackType, callbackData) {
+    if (callbackType == "connect")
+      this._mediaSoupCallback('success');
+    else if (callbackType == "produce") {
+      var _producerID = callbackData.producer_id;
+      this._mediaSoupCallback({ id: _producerID })
+    }
+  }
 
 
-  async initProducerTransports(data){
+  async initProducerTransports(data) {
 
     // init producerTransport
     this.producerTransport = this.device.createSendTransport(data);
     this.producerTransport.on(
       "connect",
       async function ({ dtlsParameters }, callback, errback) {
-        this.socket
-          .request("connectTransport", {
-            dtlsParameters,
+        this._mediaSoupCallback = callback;
+        var dataObj = {
+          commandType: "connectTransport", Data: {
+            RoomId: this.room_id,
             transport_id: data.id,
-          })
-          .then(callback)
-          .catch(errback);
+            dtlsParameters: dtlsParameters,
+            TransportsType: "Producer"
+          }
+        };
+        this.socket.sendCommand(JSON.stringify(dataObj));
       }.bind(this)
     );
+
+
 
     this.producerTransport.on(
       'produce',
       async function ({ kind, rtpParameters }, callback, errback) {
+        this._mediaSoupCallback = callback;
         try {
-          const { producer_id } = await this.socket.request('produce', {
-            producerTransportId: this.producerTransport.id,
-            kind,
-            rtpParameters
-          })
-          callback({
-            id: producer_id
-          })
+          var dataObj = {
+            commandType: "produce", Data: {
+              RoomId: this.room_id,
+              producerTransportId: this.producerTransport.id,
+              kind,
+              rtpParameters
+            }
+          };
+          this.socket.sendCommand(JSON.stringify(dataObj));
         } catch (err) {
-          errback(err)
+          alert(err)
         }
       }.bind(this)
     )
@@ -198,7 +215,7 @@ class RoomClient {
     );
   }
 
-  async initConsumerTransports(data){
+  async initConsumerTransports(data) {
 
     // init consumerTransport
     this.consumerTransport = this.device.createRecvTransport(data);
@@ -206,13 +223,16 @@ class RoomClient {
     this.consumerTransport.on(
       "connect",
       function ({ dtlsParameters }, callback, errback) {
-        this.socket
-          .request("connectTransport", {
+        this._mediaSoupCallback = callback;
+        var dataObj = {
+          commandType: "connectTransport", Data: {
+            RoomId: this.room_id,
             transport_id: this.consumerTransport.id,
-            dtlsParameters,
-          })
-          .then(callback)
-          .catch(errback);
+            dtlsParameters: dtlsParameters,
+            TransportsType: "Consumer"
+          }
+        };
+        this.socket.sendCommand(JSON.stringify(dataObj));
       }.bind(this)
     );
 
@@ -240,111 +260,17 @@ class RoomClient {
 
   }
 
-  async getProducers(name, room_id){
-      var dataObj ={commandType:"getProducers", Data: { Name:name, RoomId:room_id}};
-      await this.socket.sendCommand(JSON.stringify(dataObj))
+  async getProducers(name, room_id) {
+    var dataObj = { commandType: "getProducers", Data: { Name: name, RoomId: room_id } };
+    await this.socket.sendCommand(JSON.stringify(dataObj))
   }
 
-
-
-  async initTransports(device) {
-    // init producerTransport
-    {
-
-      this.producerTransport.on(
-        "produce",
-        async function ({ kind, rtpParameters }, callback, errback) {
-          try {
-            const { producer_id } = await this.socket.request("produce", {
-              producerTransportId: this.producerTransport.id,
-              kind,
-              rtpParameters,
-            });
-            callback({
-              id: producer_id,
-            });
-          } catch (err) {
-            errback(err);
-          }
-        }.bind(this)
-      );
-
-      this.producerTransport.on(
-        "connectionstatechange",
-        function (state) {
-          switch (state) {
-            case "connecting":
-              break;
-
-            case "connected":
-              //localVideo.srcObject = stream
-              break;
-
-            case "failed":
-              this.producerTransport.close();
-              break;
-
-            default:
-              break;
-          }
-        }.bind(this)
-      );
-    }
-
-    // init consumerTransport
-    {
-      const data = await this.socket.request("createWebRtcTransport", {
-        forceTcp: false,
-      });
-
-      if (data.error) {
-        console.error(data.error);
-        return;
-      }
-
-      // only one needed
-      this.consumerTransport = device.createRecvTransport(data);
-      this.consumerTransport.on(
-        "connect",
-        function ({ dtlsParameters }, callback, errback) {
-          this.socket
-            .request("connectTransport", {
-              transport_id: this.consumerTransport.id,
-              dtlsParameters,
-            })
-            .then(callback)
-            .catch(errback);
-        }.bind(this)
-      );
-
-      this.consumerTransport.on(
-        "connectionstatechange",
-        async function (state) {
-          switch (state) {
-            case "connecting":
-              break;
-
-            case "connected":
-              //remoteVideo.srcObject = await stream;
-              //await socket.request('resume');
-              break;
-
-            case "failed":
-              this.consumerTransport.close();
-              break;
-
-            default:
-              break;
-          }
-        }.bind(this)
-      );
-    }
-  }
 
 
   //////// MAIN FUNCTIONS /////////////
 
   async produce(type, deviceId = null) {
+    // debugger;
     let mediaConstraints = {};
     let audio = false;
     let screen = false;
@@ -386,7 +312,8 @@ class RoomClient {
       default:
         return;
     }
-debugger
+
+
     if (!this.device.canProduce("video") && !audio) {
       console.error("Cannot produce video");
       return;
@@ -416,7 +343,7 @@ debugger
         params = {
           track,
         };
-      } 
+      }
       else {
         track = stream.getAudioTracks()[0];
 
@@ -447,27 +374,15 @@ debugger
           {
             rid: "r1",
             maxBitrate: 300000,
-            scaleResolutionDownBy: 6.0,
+            scaleResolutionDownBy: 3.0,
             scalabilityMode: "L1T3",
           },
           {
             rid: "r2",
             maxBitrate: 300000,
-            scaleResolutionDownBy: 4.0,
-            scalabilityMode: "L1T3",
-          },
-          {
-            rid: "r3",
-            maxBitrate: 300000,
-            scaleResolutionDownBy: 2.0,
-            scalabilityMode: "L1T3",
-          },
-          {
-            rid: "r4",
-            maxBitrate: 900000,
             scaleResolutionDownBy: 1.0,
             scalabilityMode: "L1T3",
-          },
+          }
         ];
         params.codecOptions = {
           videoGoogleStartBitrate: 1000,
@@ -647,54 +562,72 @@ debugger
   async consume(producer_id) {
     //let info = await this.roomInfo()
 
-    this.getConsumeStream(producer_id).then(
-      function ({ consumer, stream, kind }) {
-        this.consumers.set(consumer.id, consumer);
+    this.getConsumeStream(producer_id)
 
-        let elem;
-        if (kind === "video") {
-          elem = document.createElement("video");
-          elem.srcObject = stream;
-          elem.id = consumer.id;
-          elem.playsinline = false;
-          elem.autoplay = true;
-          elem.className = "vid";
-          this.remoteVideoEl.appendChild(elem);
-          this.handleFS(elem.id);
-        } else {
-          elem = document.createElement("audio");
-          elem.srcObject = stream;
-          elem.id = consumer.id;
-          elem.playsinline = false;
-          elem.autoplay = true;
-          this.remoteAudioEl.appendChild(elem);
-        }
 
-        consumer.on(
-          "trackended",
-          function () {
-            this.removeConsumer(consumer.id);
-          }.bind(this)
-        );
 
-        consumer.on(
-          "transportclose",
-          function () {
-            this.removeConsumer(consumer.id);
-          }.bind(this)
-        );
+  }
+
+  async consumeMedia ({ consumer, stream, kind }) {
+    this.consumers.set(consumer.id, consumer);
+    let elem;
+    if (kind === "video") {
+      elem = document.createElement("video");
+      elem.srcObject = stream;
+      elem.id = consumer.id;
+      elem.playsinline = false;
+      elem.autoplay = true;
+      elem.className = "vid";
+      this.remoteVideoEl.appendChild(elem);
+      this.handleFS(elem.id);
+    } else {
+      elem = document.createElement("audio");
+      elem.srcObject = stream;
+      elem.id = consumer.id;
+      elem.playsinline = false;
+      elem.autoplay = true;
+      this.remoteAudioEl.appendChild(elem);
+    }
+
+    consumer.on(
+      "trackended",
+      function () {
+        this.removeConsumer(consumer.id);
+      }.bind(this)
+    );
+
+    consumer.on(
+      "transportclose",
+      function () {
+        this.removeConsumer(consumer.id);
       }.bind(this)
     );
   }
 
+
   async getConsumeStream(producerId) {
     const { rtpCapabilities } = this.device;
-    const data = await this.socket.request("consume", {
-      rtpCapabilities,
-      consumerTransportId: this.consumerTransport.id, // might be
-      producerId,
-    });
-    const { id, kind, rtpParameters } = data;
+    // const data = await this.socket.request("consume", {
+    //   rtpCapabilities,
+    //   consumerTransportId: this.consumerTransport.id, // might be
+    //   producerId,
+    // });
+    var dataObj = {
+      commandType: "consume", Data: {
+        RoomId: this.room_id,
+        RtpCapabilities: rtpCapabilities,
+        consumerTransportId: this.consumerTransport.id,
+        ProducerId: producerId,
+      }
+    };
+    this.socket.sendCommand(JSON.stringify(dataObj));
+
+  }
+
+  async getConsumeStreamReturn(data) {
+    const { id, kind, rtpParameters, producerId } = data;
+
+    console.log("data>>>>", data);
 
     let codecOptions = {};
     const consumer = await this.consumerTransport.consume({
@@ -708,14 +641,15 @@ debugger
     const stream = new MediaStream();
     stream.addTrack(consumer.track);
 
-    return {
+    this.consumeMedia( {
       consumer,
       stream,
       kind,
-    };
+    });
   }
 
   closeProducer(type) {
+    // debugger;
     if (!this.producerLabel.has(type)) {
       console.log("There is no producer for this type " + type);
       return;
@@ -725,10 +659,17 @@ debugger
     console.log("this", this);
     console.log("Close producer", producer_id);
 
-    this.socket.emit("producerClosed", {
-      producer_id,
-    });
+    // this.socket.emit("producerClosed", {
+    //   producer_id,
+    // });
 
+    var dataObj = { commandType: "producerClosed", Data: { RoomId: this.room_id, ProducerId: producer_id, Type: type } };
+    this.socket.sendCommand(JSON.stringify(dataObj))
+
+
+  }
+
+  producerClosedReturn(producer_id, type) {
     this.producers.get(producer_id).close();
     this.producers.delete(producer_id);
     this.producerLabel.delete(type);
@@ -791,31 +732,29 @@ debugger
 
 
 
-  async exit(offline = false,name,room_id) {
-    if (!offline) 
-    {
-      var dataObj = {commandType:"ExitRoom", Data: { Name:name, RoomId:room_id}};
+  async exit(offline = false, name, room_id) {
+    if (!offline) {
+      var dataObj = { commandType: "ExitRoom", Data: { Name: name, RoomId: room_id } };
       await this.socket.sendCommand(JSON.stringify(dataObj))
-    } 
-    else 
-    {
+    }
+    else {
       clean();
-    }   
+    }
   }
 
 
 
 
 
- clean(){
+  clean() {
     this._isOpen = false;
-    this.producerTransport.close();    
-    this.consumerTransport.close();   
+    this.producerTransport.close();
+    this.consumerTransport.close();
     this.socket.listenerRemove('disconnect');
     this.socket.listenerRemove('newProducers');
     this.socket.listenerRemove('consumerClosed');
     this.event(_EVENTS.exitRoom);
- }
+  }
 
 
   ///////  HELPERS //////////

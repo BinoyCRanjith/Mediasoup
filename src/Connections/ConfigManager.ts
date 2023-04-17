@@ -16,7 +16,7 @@ export class ConfigManager implements IConfigManager{
 
   constructor() {    
     this.Settings = {
-        listenIp: '192.168.1.103',
+        listenIp: '192.168.1.197',
         listenPort: 3016,
         sslCrt: '../ssl/certificate.pem',
         sslKey: '../ssl/key.pem',
@@ -74,7 +74,7 @@ export class ConfigManager implements IConfigManager{
     }
 
     getLocalIp(){
-      let localIp = '127.0.0.1'
+      let localIp = '192.168.1.197'
       Object.keys(ifaces).forEach((ifname) => {
         for (const iface of ifaces[ifname]) {
           if (iface.family !== 'IPv4' || iface.internal !== false) {

@@ -1,5 +1,6 @@
 if (location.href.substr(0, 5) !== 'https') location.href = 'https' + location.href.substr(4, location.href.length - 4)
-const server = new window.conference('ws://localhost:3016');
+// const server = new window.conference('ws://localhost:3016');
+const server = new window.conference('wss://192.168.1.197:3016');
 
 let producer = null;
 let roomObj = null;
@@ -21,6 +22,10 @@ const callbackEvents = {
   RoomExited: "RoomExited",
   CreateWebRtcTransportSuccess: "CreateWebRtcTransportSuccess",
   ProducersReceived: "ProducersReceived",
+  Transportconnected: "Transportconnected",
+  produced: "produced",
+  consumed: "consumed",
+  producerClosed: "producerClosed"
 };
 
 
@@ -41,10 +46,11 @@ server.connect().then((events) => {
     InitWebrtcTransport(data.Event, data)
   });
   events.on(callbackEvents.consumerClosed, function (data) {
-    roomObj.consumerClosed(data.consumer_id)
+    roomObj.consumerClosed(data.Data)
   });
   events.on(callbackEvents.newProducers, function (data) {
-    roomObj.newProducers(data)
+    ConsoleEvent(data.Event, data)
+    roomObj.newProducers(data.Data)
   });
   events.on(callbackEvents.disconnect, function (data) {
     roomObj.disconnect()
@@ -57,6 +63,20 @@ server.connect().then((events) => {
   });
   events.on(callbackEvents.ProducersReceived, function (data) {
     getProducers(data.Event, data)
+  });
+  events.on(callbackEvents.Transportconnected, function (data) {
+    Transportconnected(data.Event, data)
+  });
+  events.on(callbackEvents.produced, function (data) {
+    produced(data.Event, data)
+  });
+  events.on(callbackEvents.consumed, function (data) {
+    ConsoleEvent(data.Event, data)
+    roomObj.getConsumeStreamReturn(data.Data.params)
+  });
+  events.on(callbackEvents.producerClosed, function (data) {
+    ConsoleEvent(data.Event, data)
+    roomObj.producerClosedReturn(data.Data.ProducerId,data.Data.type);
   });
 })
 
@@ -88,7 +108,6 @@ function ReadRouterRtpCapabilities(EventName, EventData) {
 }
 
 function LoadDevice(EventName, EventData) {
-  debugger
   ConsoleEvent(EventName, EventData);
   roomObj.loadDevice(EventData.Data.Capabilities);
 }
@@ -120,6 +139,16 @@ function getProducers(EventName, EventData){
   ConsoleEvent(EventName, EventData)
   roomObj.newProducers(EventData.Data.producerList);
   roomOpen();
+}
+
+function Transportconnected(EventName, EventData){
+  ConsoleEvent(EventName, EventData)
+  roomObj.mediasoupCallback("connect",null)
+}
+
+function produced(EventName, EventData){
+  ConsoleEvent(EventName, EventData)
+  roomObj.mediasoupCallback("produce",EventData.Data)
 }
 
 
@@ -250,9 +279,15 @@ function enumerateDevices() {
 function ConsoleEvent(EventName, EventData) {
   if (consoleEvent) {
     // console.log(EventName + " : "+ JSON.stringify(EventData))
-    console.log(EventData.Data.Message)
     //alert(EventData.Data.Message)
-    LiveConsole(EventData.Data.Message);
+    if(EventData.Data.Message == undefined){
+      console.log(EventData.Message)
+      LiveConsole(EventData.Message);
+    }
+    else{
+      console.log(EventData.Data.Message)
+      LiveConsole(EventData.Data.Message);
+    }
   }
 }
 
@@ -265,30 +300,3 @@ function LiveConsole(msg) {
     ele.innerHTML += '<p>' + msg + '</p>';
   }
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-// function LoanDevice(EventName, EventData){
-//   ConsoleEvent(EventName, EventData);
-//   roomObj.loadDevice(EventData.Data).then(function(data) {
-//     /* code if successful */
-//     console.log(data)
-//     alert(data);
-//   },
-//   function(error) {
-//      /* code if some error */
-//      alert(error);
-//    }
-//   );
-//   roomOpen();
-// }

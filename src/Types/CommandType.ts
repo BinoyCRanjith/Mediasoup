@@ -26,4 +26,8 @@ export enum CommandType {
     getRouterRtpCapabilities = "getRouterRtpCapabilities",
     createWebRtcTransport = "createWebRtcTransport",
     getProducers = "getProducers",
+    connectTransport = "connectTransport",
+    produce = "produce",
+    consume="consume",
+    producerClosed="producerClosed"
 }

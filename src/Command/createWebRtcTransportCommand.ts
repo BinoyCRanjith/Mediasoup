@@ -18,7 +18,7 @@ export class createWebRtcTransportCommand implements ICommand {
 
     constructor(connectionManager: IServerManager, data: any, clientID: string) {
         this._serverManager = connectionManager;
-        this.Data = data; 
+        this.Data = data;
         this.ClientID = clientID
         this.CommandType = CommandType.Register;
         // console.log("Roomlist:"+ JSON.stringify(this.roomList));

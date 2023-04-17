@@ -7,7 +7,7 @@ import { EventTypes } from "../Types/Events";
 import { roomList } from "../Models/RoomLists";
 
 
-export class getRouterRtpCapabilitiesCommand implements ICommand {
+export class producerClosedCommand implements ICommand {
     private readonly _serverManager: IServerManager;
     Data: any = [];
     ClientID: string;
@@ -25,7 +25,7 @@ export class getRouterRtpCapabilitiesCommand implements ICommand {
         if (!isValid) {
             const registerCallBack: any = {
                 CommandType: CommandType.RegisterCallback,
-                Data: { ClientID: this.ClientID, Message: "Validation Failed!" },
+                Data: { ClientID: this.ClientID, Message: "Validation Failed!",producer_id : null, Type: null},
                 Event: EventTypes.RegistrationFailed
             }
             this._serverManager.sendTo(this.ClientID, registerCallBack);
@@ -35,31 +35,26 @@ export class getRouterRtpCapabilitiesCommand implements ICommand {
 
     async execute(): Promise<void> {
         const callBackCommand: any = {
-            CommandType: CommandType.JoinRoom,
-            Data: { ClientID: this.ClientID, Message: "RtpCapabilities Command",Capabilities:null,error:null}
+            CommandType: CommandType.producerClosed,
+            Data: { ClientID: this.ClientID, Message: "producerClosed"}
         }
         
         let room_id = this.Data.RoomId;
+        let producer_id=this.Data.ProducerId;
+        let type=this.Data.Type;
+        
+        console.log(this.Data)
 
+        roomList.get(room_id).closeProducer(this.ClientID, producer_id);
 
-          console.log('Get RouterRtpCapabilities :', {
-            name: `${roomList.get(room_id).getPeers().get(this.ClientID).name}`
-          })
+        callBackCommand.Data.Message = "producer Closed Successfully";
+        callBackCommand.Data.ProducerId = producer_id;
+        callBackCommand.Data.type = type;
+        callBackCommand.Event = EventTypes.producerClosed;
+        console.log('producerClosed')
 
-          console.log('Getting RouterRtpCapabilities');
-  
-          try {
-            callBackCommand.Data.Message = "RtpCapabilities Received";
-            callBackCommand.Data.Capabilities = roomList.get(room_id).getRtpCapabilities()
-            callBackCommand.Event = EventTypes.RtpCapabilitiesReceived;
-            console.log('RtpCapabilities Received');
-          } catch (e) {
-            callBackCommand.Data.Message = e.message;
-            callBackCommand.Data.error = e;        
-            callBackCommand.Event = EventTypes.RtpCapabilitiesError;
-            console.log(e.message)
-          }
+        console.log(callBackCommand)
 
-          this._serverManager.sendTo(this.ClientID, callBackCommand);
+        this._serverManager.sendTo(this.ClientID, callBackCommand);
     }
 }
