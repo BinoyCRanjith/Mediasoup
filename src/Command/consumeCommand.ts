@@ -25,7 +25,7 @@ export class consumeCommand implements ICommand {
         if (!isValid) {
             const registerCallBack: any = {
                 CommandType: CommandType.RegisterCallback,
-                Data: { ClientID: this.ClientID, Message: "Validation Failed!",params : null},
+                Data: { ClientID: this.ClientID, Message: "Validation Failed!", params: null },
                 Event: EventTypes.RegistrationFailed
             }
             this._serverManager.sendTo(this.ClientID, registerCallBack);
@@ -36,41 +36,41 @@ export class consumeCommand implements ICommand {
     async execute(): Promise<void> {
         const callBackCommand: any = {
             CommandType: CommandType.connectTransport,
-            Data: { ClientID: this.ClientID, Message: "produced Command"}
+            Data: { ClientID: this.ClientID, Message: "produced Command" }
         }
-        
+
         let room_id = this.Data.RoomId;
         let consumerTransportId = this.Data.consumerTransportId;
         let producerId = this.Data.ProducerId;
         let rtpCapabilities = this.Data.RtpCapabilities;
 
 
-        
-        
+
+
         let params = await roomList.get(room_id).consume(this.ClientID, consumerTransportId, producerId, rtpCapabilities)
 
         if (params == null) {
-          console.log("...................")
-          console.log("params is null");
-          console.log("...................")
+            console.log("...................")
+            console.log("params is null");
+            console.log("...................")
         }
-    
+
         console.log('Consuming', {
-          name: `${roomList.get(room_id) && roomList.get(room_id).getPeers().get(this.ClientID).name}`,
-          producer_id: `${producerId}`,
-          consumer_id: `${(params == null) ? null : params.id}`
+            name: `${roomList.get(room_id) && roomList.get(room_id).getPeers().get(this.ClientID).name}`,
+            producer_id: `${producerId}`,
+            consumer_id: `${(params == null) ? null : params.id}`
         })
 
         callBackCommand.Data.Message = "consumed";
         callBackCommand.Data.params = params;
         callBackCommand.Event = EventTypes.consumed;
         console.log('consumed')
-        console.log("callBack",callBackCommand);
-        console.log("params",params);
-        
-        
-        
+        console.log("callBack", callBackCommand);
+        console.log("params", params);
 
         this._serverManager.sendTo(this.ClientID, callBackCommand);
+
+
+        this._serverManager.sendParticipantList(room_id)
     }
 }

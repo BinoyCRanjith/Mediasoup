@@ -269,6 +269,7 @@ class RoomClient {
 
   //////// MAIN FUNCTIONS /////////////
 
+
   async replace(type, deviceId = null) {
     let mediaConstraints = {}
     let audio = false
@@ -364,6 +365,7 @@ class RoomClient {
       console.log('Produce error:', err)
     }
   }
+
 
   async produce(type, deviceId = null) {
     // debugger;
@@ -664,7 +666,7 @@ class RoomClient {
 
   }
 
-  async consumeMedia ({ consumer, stream, kind }) {
+  async consumeMedia({ consumer, stream, kind }) {
     this.consumers.set(consumer.id, consumer);
     let elem;
     if (kind === "video") {
@@ -737,7 +739,7 @@ class RoomClient {
     const stream = new MediaStream();
     stream.addTrack(consumer.track);
 
-    this.consumeMedia( {
+    this.consumeMedia({
       consumer,
       stream,
       kind,

@@ -13,34 +13,31 @@ const mediasoup = require('mediasoup')
 const path = require('path')
 const app = express()
 
-
-
-
 export class SocketServer implements IServerManager {
 
   private readonly config: IConfigManager;
-  private defaultPort: number ;
-  private commandHandler: ICommandHandler  ;
+  private defaultPort: number;
+  private commandHandler: ICommandHandler;
   private workers: any = []
   private nextMediasoupWorkerIdx = 0
   private roomList = new Map();
-  private io :any;
-  
+  private io: any;
+
 
   constructor() {
-    
-     this.config = new ConfigManager();
+
+    this.config = new ConfigManager();
 
     const options = {
-      key: fs.readFileSync(path.join(__dirname,'../' ,this.config.Settings.sslKey), 'utf-8'),
-      cert: fs.readFileSync(path.join(__dirname,'../', this.config.Settings.sslCrt), 'utf-8')
+      key: fs.readFileSync(path.join(__dirname, '../', this.config.Settings.sslKey), 'utf-8'),
+      cert: fs.readFileSync(path.join(__dirname, '../', this.config.Settings.sslCrt), 'utf-8')
     }
 
     const httpsServer = https.createServer(options, app)
 
     this.io = require('socket.io')(httpsServer)
 
-    app.use(express.static(path.join(__dirname, '../../','public')))
+    app.use(express.static(path.join(__dirname, '../../', 'public')))
 
     httpsServer.listen(this.config.Settings.listenPort, () => {
       console.log('Listening on https://' + this.config.Settings.listenIp + ':' + this.config.Settings.listenPort)
@@ -52,21 +49,21 @@ export class SocketServer implements IServerManager {
     this.defaultPort = port;
     return this;
   }
+
   connect(): IServerManager {
     this.createWorkers();
-    this.SocketConnect(this.io,this.roomList);    
+    this.SocketConnect(this.io, this.roomList);
     return this;
   }
 
-  setCommandHandler(commandHandler: ICommandHandler): IServerManager{
+  setCommandHandler(commandHandler: ICommandHandler): IServerManager {
     if (commandHandler.commandFactory === null) {
-        console.error(`Invalid Command Handler, Error : Command Factory Missing`);
-        return this;
+      console.error(`Invalid Command Handler, Error : Command Factory Missing`);
+      return this;
     }
     this.commandHandler = commandHandler;
     return this;
   }
-
 
   async createWorkers(): Promise<void> {
     let { numWorkers } = this.config.Settings.mediasoup
@@ -87,15 +84,14 @@ export class SocketServer implements IServerManager {
     }
   }
 
-
   SocketConnect(io: any, roomList: any) {
 
     io.on('connection', (socket) => {
 
-      socket.on('reconnect_failed', function(room_id) {
+      socket.on('reconnect_failed', function (room_id) {
         console.log('Reconnection failed');
-    })
-      
+      })
+
       socket.on('createRoom', async ({ room_id }, callback) => {
         if (roomList.has(room_id)) {
           callback('already exists')
@@ -279,37 +275,22 @@ export class SocketServer implements IServerManager {
     return worker
   }
 
-
-  broadCastToGroup(group: string, data: any): void {
-    throw new Error("Method not implemented.");
-  }
   sendTo(target: string, data: any): void {
     throw new Error("Method not implemented.");
   }
-  broadCast(data: any): void {
+
+  broadCastRoom(callBackCommand: any, room_id: any): void {
     throw new Error("Method not implemented.");
   }
-  getMediaServer() {
+
+  BroadcastToOtherParticipantsInRoom(callBackCommand: any, room_id: any, sender: any): void {
     throw new Error("Method not implemented.");
   }
-  getEndPoint() {
+
+  sendParticipantList(roomId: any): void {
     throw new Error("Method not implemented.");
   }
-  getOutGoingStreamInfo() {
-    throw new Error("Method not implemented.");
-  }
-  setTransporder(transporder: any): void {
-    throw new Error("Method not implemented.");
-  }
-  setTransport(transport: any, key: string): void {
-    throw new Error("Method not implemented.");
-  }
-  getTransport(key?: string | undefined) {
-    throw new Error("Method not implemented.");
-  }
-  selectLayer(msg: any): void {
-    throw new Error("Method not implemented.");
-  }
+
   cleanUp(): void {
     throw new Error("Method not implemented.");
   }

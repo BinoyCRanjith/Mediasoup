@@ -25,7 +25,7 @@ export class producerClosedCommand implements ICommand {
         if (!isValid) {
             const registerCallBack: any = {
                 CommandType: CommandType.RegisterCallback,
-                Data: { ClientID: this.ClientID, Message: "Validation Failed!",producer_id : null, Type: null},
+                Data: { ClientID: this.ClientID, Message: "Validation Failed!", producer_id: null, Type: null },
                 Event: EventTypes.RegistrationFailed
             }
             this._serverManager.sendTo(this.ClientID, registerCallBack);
@@ -36,13 +36,13 @@ export class producerClosedCommand implements ICommand {
     async execute(): Promise<void> {
         const callBackCommand: any = {
             CommandType: CommandType.producerClosed,
-            Data: { ClientID: this.ClientID, Message: "producerClosed"}
+            Data: { ClientID: this.ClientID, Message: "producerClosed" }
         }
-        
+
         let room_id = this.Data.RoomId;
-        let producer_id=this.Data.ProducerId;
-        let type=this.Data.Type;
-        
+        let producer_id = this.Data.ProducerId;
+        let type = this.Data.Type;
+
         console.log(this.Data)
 
         roomList.get(room_id).closeProducer(this.ClientID, producer_id);
@@ -56,5 +56,9 @@ export class producerClosedCommand implements ICommand {
         console.log(callBackCommand)
 
         this._serverManager.sendTo(this.ClientID, callBackCommand);
+
+
+
+        this._serverManager.sendParticipantList(room_id)
     }
 }

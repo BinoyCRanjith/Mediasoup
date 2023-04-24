@@ -36,24 +36,31 @@ export class getProducersCommand implements ICommand {
     async execute(): Promise<void> {
         const callBackCommand: any = {
             CommandType: CommandType.getProducers,
-            Data: { ClientID: this.ClientID, Message: "get Producers Command",producerList:null}
+            Data: { ClientID: this.ClientID, Message: "get Producers Command", producerList: null }
         }
-        
+
         let room_id = this.Data.RoomId;
 
-        if (!roomList.has(room_id)){
-          callBackCommand.Data.Message = "Room Already Exists."
-          callBackCommand.Event = EventTypes.RoomAlreadyExist;
-        } 
-        else{
-          console.log('Get producers', { name: `${roomList.get(room_id).getPeers().get(this.ClientID).name}` })
-          let producerList = roomList.get(room_id).getProducerListForPeer()
-          callBackCommand.Data.Message = "Producers Received";
-          callBackCommand.Data.producerList = producerList;
-          callBackCommand.Event = EventTypes.ProducersReceived;
-          console.log('Producers Received')
+        if (!roomList.has(room_id)) {
+            callBackCommand.Data.Message = "Room Already Exists."
+            callBackCommand.Event = EventTypes.RoomAlreadyExist;
+        }
+        else {
+            console.log('Get producers', { name: `${roomList.get(room_id).getPeers().get(this.ClientID).name}` })
+            let producerList = roomList.get(room_id).getProducerListForPeer()
+            callBackCommand.Data.Message = "Producers Received";
+            callBackCommand.Data.producerList = producerList;
+            callBackCommand.Event = EventTypes.ProducersReceived;
+            console.log('Producers Received')
         }
 
         this._serverManager.sendTo(this.ClientID, callBackCommand);
+
+
+
+        this._serverManager.sendParticipantList(room_id)
+
     }
+
+
 }
